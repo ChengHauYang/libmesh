@@ -1820,7 +1820,29 @@ public:
   const std::set<subdomain_id_type> & get_mesh_subdomains() const
   { libmesh_assert(this->is_prepared()); return _mesh_subdomains; }
 
+  using ElemSide = std::pair<dof_id_type, unsigned int>;
+
+  /**
+   * Add a pair of disconnected neighbors
+   */
+  void add_disconnected_neighbors(const ElemSide &side1, const ElemSide &side2);
+
+  /**
+   * Find the disconnected neighbor for the given element and side
+   */
+  std::optional<MeshBase::ElemSide> disconnected_neighbor(dof_id_type elem_id, unsigned int side) const;
+
 protected:
+
+  /**
+   * The set of pair of disconnected neighbors
+   */
+  std::set<std::pair<ElemSide, ElemSide>> _disconnected_neighbors;
+
+  /**
+   * Cache for quick lookup of disconnected neighbors
+   */
+  mutable std::map<ElemSide, ElemSide> _cached_disconnected_neighbors;
 
   /**
    * This class holds the boundary information.  It can store nodes, edges,

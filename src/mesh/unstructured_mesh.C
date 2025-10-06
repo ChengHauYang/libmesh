@@ -1216,6 +1216,29 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
 #endif // AMR
 
+  // Add disconnected neighbors
+  if (!_disconnected_neighbors.empty())
+  {
+    for (const auto & pair : _disconnected_neighbors)
+    {
+      const ElemSide & side1 = pair.first;
+      const ElemSide & side2 = pair.second;
+
+      Elem * elem1 = this->elem_ptr(side1.first);
+      Elem * elem2 = this->elem_ptr(side2.first);
+      const unsigned int s1 = side1.second;
+      const unsigned int s2 = side2.second;
+
+      // Safety check
+      if (!elem1 || !elem2)
+        continue;
+
+      elem1->set_neighbor(s1, elem2);
+      elem2->set_neighbor(s2, elem1);
+    }
+  }
+
+
 
 #ifdef DEBUG
   MeshTools::libmesh_assert_valid_neighbors(*this,

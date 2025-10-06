@@ -2450,6 +2450,44 @@ std::string MeshBase::get_local_constraints(bool print_nonlocal) const
   return os.str();
 }
 
+  void MeshBase::add_disconnected_neighbors(const ElemSide &side1,
+                                            const ElemSide &side2)
+  {
+    _disconnected_neighbors.insert(std::make_pair(side1, side2));
+  }
+
+
+ std::optional<MeshBase::ElemSide>
+  MeshBase::disconnected_neighbor(dof_id_type elem_id, unsigned int side) const
+  {
+    // Quick return if we have no disconnected neighbors
+    if (!_disconnected_neighbors.size())
+      return std::nullopt;
+
+    // Check the cache first
+    auto it = _cached_disconnected_neighbors.find({elem_id, side});
+    if (it != _cached_disconnected_neighbors.end())
+      return it->second;
+
+    for (const auto &[elemside1, elemside2] : _disconnected_neighbors)
+    {
+      const auto [elem1, side1] = elemside1;
+      const auto [elem2, side2] = elemside2;
+
+      if (elem1 == elem_id && side1 == side)
+      {
+        _cached_disconnected_neighbors.emplace(elemside1, elemside2);
+        return elemside2;
+      }
+      else if (elem2 == elem_id && side2 == side)
+      {
+        _cached_disconnected_neighbors.emplace(elemside2, elemside1);
+        return elemside1;
+      }
+    }
+
+    return std::nullopt;
+  }
 
 
 
