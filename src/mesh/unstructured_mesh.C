@@ -47,6 +47,11 @@
 #include <sstream>
 #include <unordered_map>
 
+// TIMPI includes
+#include "timpi/parallel_implementation.h"
+#include "timpi/parallel_sync.h"
+
+
 namespace {
 
 using namespace libMesh;
@@ -1217,28 +1222,74 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 #endif // AMR
 
   // Add disconnected neighbors
-  if (!_disconnected_neighbors.empty())
-  {
-    for (const auto & pair : _disconnected_neighbors)
+  using ElemSideDisconnectedElemTuple = std::tuple<dof_id_type, unsigned int, dof_id_type>; // (elem_id, side, disconnected_elem_id)
+  std::map<processor_id_type, std::vector<ElemSideDisconnectedElemTuple>> to_owner;
+  for (const auto & [elemside1, elemside2] : _disconnected_neighbors)
     {
-      const ElemSide & side1 = pair.first;
-      const ElemSide & side2 = pair.second;
+      const auto & [eid1, s1] = elemside1;
+      const auto & [eid2, s2] = elemside2;
+      Elem * elem1 = elem_ptr(eid1);
+      Elem * elem2 = elem_ptr(eid2);
+      libmesh_assert(elem1);
+      libmesh_assert(elem2);
 
-      Elem * elem1 = this->elem_ptr(side1.first);
-      Elem * elem2 = this->elem_ptr(side2.first);
-      const unsigned int s1 = side1.second;
-      const unsigned int s2 = side2.second;
+      // Make sure these two elements don't already have neighbors on these sides
+      // libmesh_assert_not_equal_to (elem1->neighbor_ptr(s1), nullptr);
+      // libmesh_assert_not_equal_to (elem2->neighbor_ptr(s2), nullptr);
 
-      // Safety check
-      if (!elem1 || !elem2)
-        continue;
+// #ifdef DEBUG
+//       // Make sure these two elements are actually disconnected
+//       for (auto s : elem1->side_index_range())
+//         libmesh_assert_not_equal_to (elem1->neighbor_ptr(s), elem2);
+//       for (auto s : elem2->side_index_range())
+//         libmesh_assert_not_equal_to (elem2->neighbor_ptr(s), elem1);
+// #endif
+
+      // elem1 and the mesh are in the same processor, but elem2 might not be.
+      // But, no matter what, this elem1's neighbor on side s1 is elem2, and vice versa should be add to current processor's data structure.
+      // this is for passing
+      // unsigned int rev = neigh->which_neighbor_am_i(elem);
+      // libmesh_assert_less (rev, neigh->n_neighbors());
 
       elem1->set_neighbor(s1, elem2);
       elem2->set_neighbor(s2, elem1);
+
+      if (elem1->processor_id() != elem2->processor_id())
+      {
+        // Ensure that both elements have their neighbor relationship properly established on the other processor as well.
+        // So, this processor results are also consistent.
+        to_owner[elem2->processor_id()].emplace_back(eid2, s2, eid1);
+        to_owner[elem2->processor_id()].emplace_back(eid1, s1, eid2);
+      }
+
+
+
+      // if (elem2->processor_id() == this->processor_id())
+      //   std::cout << "Info: disconnected neighbor element " << eid2 << " is local on proc " << this->processor_id() << std::endl;
+      // else
+      //   std::cout << "Info: disconnected neighbor element " << eid2 << " is remote on proc " << elem2->processor_id() << std::endl;
+
+      // else
+      //   to_owner[elem2->processor_id()].emplace_back(eid2, s2, eid1);
     }
-  }
+  Parallel::push_parallel_vector_data(
+      comm(),
+      to_owner,
+      [&](processor_id_type, const std::vector<ElemSideDisconnectedElemTuple> & recv_data)
+      {
+        for (const auto & tuple : recv_data)
+          {
+            const auto elem_id = std::get<0>(tuple);
+            const auto side = std::get<1>(tuple);
+            const auto disconnected_elem_id = std::get<2>(tuple);
 
-
+            Elem * elem = elem_ptr(elem_id);
+            libmesh_assert(elem);
+            Elem * disconnected_elem = elem_ptr(disconnected_elem_id);
+            libmesh_assert(disconnected_elem);
+            elem->set_neighbor(side, disconnected_elem);
+          }
+      });
 
 #ifdef DEBUG
   MeshTools::libmesh_assert_valid_neighbors(*this,
