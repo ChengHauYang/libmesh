@@ -891,7 +891,7 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
   if (reset_current_list)
     for (const auto & e : this->element_ptr_range())
       for (auto s : e->side_index_range())
-        if (e->neighbor_ptr(s) != remote_elem || reset_remote_elements)
+        if (e->neighbor_ptr(s) != remote_elem || reset_remote_elements || !e->has_disconnected_neighbor(s))
           e->set_neighbor(s, nullptr);
 
   // Find neighboring elements by first finding elements
@@ -1221,7 +1221,7 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
 #endif // AMR
 
-find_disconnected_neighbors();
+// find_disconnected_neighbors();
 
 #ifdef DEBUG
   MeshTools::libmesh_assert_valid_neighbors(*this,
@@ -1269,13 +1269,16 @@ void UnstructuredMesh::find_disconnected_neighbors ()
       elem1->set_neighbor(s1, elem2);
       elem2->set_neighbor(s2, elem1);
 
-      if (elem1->processor_id() != elem2->processor_id())
-      {
-        // Ensure that both elements have their neighbor relationship properly established on the other processor as well.
-        // So, this processor results are also consistent.
-        to_owner[elem2->processor_id()].emplace_back(eid2, s2, eid1);
-        to_owner[elem2->processor_id()].emplace_back(eid1, s1, eid2);
-      }
+      elem1->set_disconnected_neighbor(s1);
+      elem2->set_disconnected_neighbor(s2);
+
+      // if (elem1->processor_id() != elem2->processor_id())
+      // {
+      //   // Ensure that both elements have their neighbor relationship properly established on the other processor as well.
+      //   // So, this processor results are also consistent.
+      //   to_owner[elem2->processor_id()].emplace_back(eid2, s2, eid1);
+      //   to_owner[elem2->processor_id()].emplace_back(eid1, s1, eid2);
+      // }
 
 
 
@@ -1287,24 +1290,25 @@ void UnstructuredMesh::find_disconnected_neighbors ()
       // else
       //   to_owner[elem2->processor_id()].emplace_back(eid2, s2, eid1);
     }
-  Parallel::push_parallel_vector_data(
-      comm(),
-      to_owner,
-      [&](processor_id_type, const std::vector<ElemSideDisconnectedElemTuple> & recv_data)
-      {
-        for (const auto & tuple : recv_data)
-          {
-            const auto elem_id = std::get<0>(tuple);
-            const auto side = std::get<1>(tuple);
-            const auto disconnected_elem_id = std::get<2>(tuple);
+  // Parallel::push_parallel_vector_data(
+  //     comm(),
+  //     to_owner,
+  //     [&](processor_id_type, const std::vector<ElemSideDisconnectedElemTuple> & recv_data)
+  //     {
+  //       for (const auto & tuple : recv_data)
+  //         {
+  //           const auto elem_id = std::get<0>(tuple);
+  //           const auto side = std::get<1>(tuple);
+  //           const auto disconnected_elem_id = std::get<2>(tuple);
 
-            Elem * elem = elem_ptr(elem_id);
-            libmesh_assert(elem);
-            Elem * disconnected_elem = elem_ptr(disconnected_elem_id);
-            libmesh_assert(disconnected_elem);
-            elem->set_neighbor(side, disconnected_elem);
-          }
-      });
+  //           Elem * elem = elem_ptr(elem_id);
+  //           libmesh_assert(elem);
+  //           Elem * disconnected_elem = elem_ptr(disconnected_elem_id);
+  //           libmesh_assert(disconnected_elem);
+  //           elem->set_neighbor(side, disconnected_elem);
+  //           elem->set_disconnected_neighbor(side);
+  //         }
+  //     });
 }
 
 

@@ -2458,15 +2458,15 @@ void MeshBase::add_disconnected_neighbors (const std::pair<dof_id_type, unsigned
   // An element cannot be a disconnected neighbor to itself
   libmesh_assert_not_equal_to (es1.first, es2.first);
   const auto * const e1 = elem_ptr(es1.first);
-  if (e1->processor_id() == this->processor_id())
-    {
+  // if (e1->processor_id() == this->processor_id())
+  //   {
       _disconnected_neighbors.emplace(es1, es2);
       #ifdef DEBUG
         // Make sure es2 is local or ghost
         const auto * const e2 = elem_ptr(es2.first);
         libmesh_assert (e2);
       #endif
-    }
+  // }
 }
 
 // Explicit instantiations for our template function

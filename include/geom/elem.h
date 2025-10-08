@@ -385,6 +385,22 @@ public:
   bool has_neighbor (const Elem * elem) const;
 
   /**
+   * Marks the \f$ i^{th} \f$ neighbor as disconnected.
+   */
+  void set_disconnected_neighbor(unsigned int i);
+
+  /**
+   * \returns \p true if the \f$ i^{th} \f$ neighbor is disconnected,
+   * \p false otherwise.
+   */
+  bool has_disconnected_neighbor(unsigned int i) const;
+
+  /**
+   * Clears all disconnected neighbors.
+   */
+  void clear_disconnected_neighbors();
+
+  /**
    * \returns If \p elem is a neighbor of a child of this element, a
    * pointer to that child, otherwise \p nullptr.
    */
@@ -2302,6 +2318,12 @@ protected:
    * RATIONAL_BERNSTEIN nodal weight data index.
    */
   unsigned char _map_data;
+
+  /**
+   * Vector of flags indicating whether each neighbor is known to be
+   * disconnected
+   */
+  std::vector<bool> _has_disconnected_neighbor;
 };
 
 
@@ -2390,7 +2412,8 @@ Elem::Elem(const unsigned int nn,
   _p_level(0),
 #endif
   _map_type(p ? p->mapping_type() : 0),
-  _map_data(p ? p->mapping_data() : 0)
+  _map_data(p ? p->mapping_data() : 0),
+  _has_disconnected_neighbor(ns, false)
 {
   this->processor_id() = DofObject::invalid_processor_id;
 
@@ -2621,6 +2644,34 @@ void Elem::set_neighbor (const unsigned int i, Elem * n)
   libmesh_assert_less (i, this->n_neighbors());
 
   _elemlinks[i+1] = n;
+}
+
+
+
+inline
+void Elem::set_disconnected_neighbor(unsigned int i)
+{
+  libmesh_assert_less(i, _has_disconnected_neighbor.size());
+  _has_disconnected_neighbor[i] = true;
+}
+
+
+
+inline
+bool Elem::has_disconnected_neighbor(unsigned int i) const
+{
+  libmesh_assert_less(i, _has_disconnected_neighbor.size());
+  return _has_disconnected_neighbor[i];
+}
+
+
+
+inline
+void Elem::clear_disconnected_neighbors()
+{
+  std::fill(_has_disconnected_neighbor.begin(),
+            _has_disconnected_neighbor.end(),
+            false);
 }
 
 
