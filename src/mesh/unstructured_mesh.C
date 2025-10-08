@@ -1221,6 +1221,21 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
 #endif // AMR
 
+find_disconnected_neighbors();
+
+#ifdef DEBUG
+  MeshTools::libmesh_assert_valid_neighbors(*this,
+                                            !reset_remote_elements);
+  MeshTools::libmesh_assert_valid_amr_interior_parents(*this);
+#endif
+}
+
+
+
+
+
+void UnstructuredMesh::find_disconnected_neighbors ()
+{
   // Add disconnected neighbors
   using ElemSideDisconnectedElemTuple = std::tuple<dof_id_type, unsigned int, dof_id_type>; // (elem_id, side, disconnected_elem_id)
   std::map<processor_id_type, std::vector<ElemSideDisconnectedElemTuple>> to_owner;
@@ -1290,12 +1305,6 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
             elem->set_neighbor(side, disconnected_elem);
           }
       });
-
-#ifdef DEBUG
-  MeshTools::libmesh_assert_valid_neighbors(*this,
-                                            !reset_remote_elements);
-  MeshTools::libmesh_assert_valid_amr_interior_parents(*this);
-#endif
 }
 
 
