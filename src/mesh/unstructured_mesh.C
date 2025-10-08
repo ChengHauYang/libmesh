@@ -51,7 +51,6 @@
 #include "timpi/parallel_implementation.h"
 #include "timpi/parallel_sync.h"
 
-
 namespace {
 
 using namespace libMesh;
@@ -877,6 +876,8 @@ UnstructuredMesh::~UnstructuredMesh ()
 void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
                                        const bool reset_current_list)
 {
+
+  std::cout << "Finding neighbors..." << std::endl;
   // We might actually want to run this on an empty mesh
   // (e.g. the boundary mesh for a nonexistent bcid!)
   // libmesh_assert_not_equal_to (this->n_nodes(), 0);
@@ -891,7 +892,7 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
   if (reset_current_list)
     for (const auto & e : this->element_ptr_range())
       for (auto s : e->side_index_range())
-        if (e->neighbor_ptr(s) != remote_elem || reset_remote_elements || !e->has_disconnected_neighbor(s))
+        if (e->neighbor_ptr(s) != remote_elem || reset_remote_elements || !_has_prepare_disconnected_neighbors)
           e->set_neighbor(s, nullptr);
 
   // Find neighboring elements by first finding elements
@@ -1221,7 +1222,8 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
 #endif // AMR
 
-// find_disconnected_neighbors();
+if (!_has_prepare_disconnected_neighbors)
+  find_disconnected_neighbors();
 
 #ifdef DEBUG
   MeshTools::libmesh_assert_valid_neighbors(*this,
@@ -1232,10 +1234,34 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
 
 
+// void UnstructuredMesh::transfer_disconnected_neighbors_to_pointer ()
+// {
+//   // Add disconnected neighbors
+//   using ElemSideDisconnectedElemTuple = std::tuple<dof_id_type, unsigned int, dof_id_type>; // (elem_id, side, disconnected_elem_id)
+//   std::map<processor_id_type, std::vector<ElemSideDisconnectedElemTuple>> to_owner;
+//   for (const auto & [elemside1, elemside2] : _disconnected_neighbors)
+//     {
+//       const auto & [eid1, s1] = elemside1;
+//       const auto & [eid2, s2] = elemside2;
+//       Elem * elem1 = elem_ptr(eid1);
+//       Elem * elem2 = elem_ptr(eid2);
+
+
+//       _disconnected_neighbors_vec.emplace_back(std::make_pair(std::make_pair(elem1, s1), std::make_pair(elem2, s2)));
+//     }
+
+//   _has_prepare_disconnected_neighbors = true;
+// }
+
+
+
+
 
 
 void UnstructuredMesh::find_disconnected_neighbors ()
 {
+
+  std::cout << "Finding disconnected neighbors..." << std::endl;
   // Add disconnected neighbors
   using ElemSideDisconnectedElemTuple = std::tuple<dof_id_type, unsigned int, dof_id_type>; // (elem_id, side, disconnected_elem_id)
   std::map<processor_id_type, std::vector<ElemSideDisconnectedElemTuple>> to_owner;
@@ -1245,8 +1271,13 @@ void UnstructuredMesh::find_disconnected_neighbors ()
       const auto & [eid2, s2] = elemside2;
       Elem * elem1 = elem_ptr(eid1);
       Elem * elem2 = elem_ptr(eid2);
-      libmesh_assert(elem1);
-      libmesh_assert(elem2);
+
+      if (!elem1)
+        std::cout << "Could not find element with id " + std::to_string(eid1) + " in the mesh";
+
+      if (!elem2)
+        std::cout << "Could not find element with id " + std::to_string(eid2) + " in the mesh";
+
 
       // Make sure these two elements don't already have neighbors on these sides
       // libmesh_assert_not_equal_to (elem1->neighbor_ptr(s1), nullptr);
@@ -1266,20 +1297,43 @@ void UnstructuredMesh::find_disconnected_neighbors ()
       // unsigned int rev = neigh->which_neighbor_am_i(elem);
       // libmesh_assert_less (rev, neigh->n_neighbors());
 
-      elem1->set_neighbor(s1, elem2);
-      elem2->set_neighbor(s2, elem1);
+          std::cout << "elem1 " << elem1->id() << " side " << (int)s1 << " proc " << elem1->processor_id()
+                    << " elem2 " << elem2->id() << " side " << (int)s2 << " proc " << elem2->processor_id() << std::endl;
 
-      elem1->set_disconnected_neighbor(s1);
-      elem2->set_disconnected_neighbor(s2);
-
-      // if (elem1->processor_id() != elem2->processor_id())
-      // {
-      //   // Ensure that both elements have their neighbor relationship properly established on the other processor as well.
-      //   // So, this processor results are also consistent.
-      //   to_owner[elem2->processor_id()].emplace_back(eid2, s2, eid1);
-      //   to_owner[elem2->processor_id()].emplace_back(eid1, s1, eid2);
+      // Check elem1
+      if (elem1->processor_id() != processor_id())
+      {
+        std::cout << "Info: disconnected neighbor element " << elem1->id() << " is remote on proc " << elem1->processor_id() << std::endl;
+        to_owner[elem1->processor_id()].emplace_back(eid2, s2, eid1);
+        to_owner[elem1->processor_id()].emplace_back(eid1, s1, eid2);
+      }
+      // else {
+      //   elem1->set_neighbor(s1, elem2);
+      //   elem1->set_disconnected_neighbor(s1);
+      //   std::cout << "Info: disconnected neighbor element " << eid1 << " is local on proc " << elem1->processor_id() << std::endl;
       // }
 
+      // Check elem2
+      if (elem2->processor_id() != processor_id())
+      {
+        std::cout << "Info: disconnected neighbor element " << eid2 << " is remote on proc " << elem2->processor_id() << std::endl;
+        to_owner[elem2->processor_id()].emplace_back(eid2, s2, eid1);
+        to_owner[elem2->processor_id()].emplace_back(eid1, s1, eid2);
+      }
+      // else {
+      //   elem2->set_neighbor(s2, elem1);
+      //   elem2->set_disconnected_neighbor(s2);
+      //   std::cout << "Info: disconnected neighbor element " << eid2 << " is local on proc " << elem2->processor_id() << std::endl;
+      // }
+
+      // If either is local, set directly
+      if (elem1->processor_id() == processor_id() || elem2->processor_id() == processor_id())
+      {
+        elem1->set_neighbor(s1, elem2);
+        elem1->set_disconnected_neighbor(s1);
+        elem2->set_neighbor(s2, elem1);
+        elem2->set_disconnected_neighbor(s2);
+      }
 
 
       // if (elem2->processor_id() == this->processor_id())
@@ -1290,25 +1344,25 @@ void UnstructuredMesh::find_disconnected_neighbors ()
       // else
       //   to_owner[elem2->processor_id()].emplace_back(eid2, s2, eid1);
     }
-  // Parallel::push_parallel_vector_data(
-  //     comm(),
-  //     to_owner,
-  //     [&](processor_id_type, const std::vector<ElemSideDisconnectedElemTuple> & recv_data)
-  //     {
-  //       for (const auto & tuple : recv_data)
-  //         {
-  //           const auto elem_id = std::get<0>(tuple);
-  //           const auto side = std::get<1>(tuple);
-  //           const auto disconnected_elem_id = std::get<2>(tuple);
+  Parallel::push_parallel_vector_data(
+      comm(),
+      to_owner,
+      [&](processor_id_type, const std::vector<ElemSideDisconnectedElemTuple> & recv_data)
+      {
+        for (const auto & tuple : recv_data)
+          {
+            const auto elem_id = std::get<0>(tuple);
+            const auto side = std::get<1>(tuple);
+            const auto disconnected_elem_id = std::get<2>(tuple);
 
-  //           Elem * elem = elem_ptr(elem_id);
-  //           libmesh_assert(elem);
-  //           Elem * disconnected_elem = elem_ptr(disconnected_elem_id);
-  //           libmesh_assert(disconnected_elem);
-  //           elem->set_neighbor(side, disconnected_elem);
-  //           elem->set_disconnected_neighbor(side);
-  //         }
-  //     });
+            Elem * elem = elem_ptr(elem_id);
+            libmesh_assert(elem);
+            Elem * disconnected_elem = elem_ptr(disconnected_elem_id);
+            libmesh_assert(disconnected_elem);
+            elem->set_neighbor(side, disconnected_elem);
+            elem->set_disconnected_neighbor(side);
+          }
+      });
 }
 
 

@@ -290,6 +290,8 @@ public:
    */
   virtual void find_disconnected_neighbors () override;
 
+  // void transfer_disconnected_neighbors_to_pointer();
+
 
 #ifdef LIBMESH_ENABLE_AMR
   /**
@@ -319,7 +321,6 @@ private:
                                 bool remap_subdomain_ids,
                                 bool prepare_after_stitching);
 };
-
 
 } // namespace libMesh
 

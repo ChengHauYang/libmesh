@@ -1855,6 +1855,9 @@ protected:
   std::map<std::pair<dof_id_type, unsigned int>,
            std::pair<dof_id_type, unsigned int>> _disconnected_neighbors;
 
+  std::vector<std::pair<std::pair<Elem*, unsigned int>,
+              std::pair<Elem*, unsigned int>>> _disconnected_neighbors_vec;
+
   /**
    * This class holds the boundary information.  It can store nodes, edges,
    * and faces with a corresponding id that facilitates setting boundary
@@ -1929,6 +1932,9 @@ protected:
    * Flag indicating if the mesh has been prepared for use.
    */
   bool _is_prepared;
+
+
+  bool _has_prepare_disconnected_neighbors;
 
   /**
    * A \p PointLocator class for this mesh.
