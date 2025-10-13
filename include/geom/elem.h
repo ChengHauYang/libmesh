@@ -2415,8 +2415,7 @@ Elem::Elem(const unsigned int nn,
 #endif
   _map_type(p ? p->mapping_type() : 0),
   _map_data(p ? p->mapping_data() : 0),
-  _has_disconnected_neighbor(ns, false),
-  _disconnected_neighbors(ns, nullptr)
+  _has_disconnected_neighbor(ns, false)
 {
   this->processor_id() = DofObject::invalid_processor_id;
 
@@ -2626,9 +2625,7 @@ const Elem * Elem::neighbor_ptr (unsigned int i) const
 {
   libmesh_assert_less (i, this->n_neighbors());
 
-  auto neighbor = _elemlinks[i+1] ? _elemlinks[i+1] : _disconnected_neighbors[i];
-
-  return neighbor;
+  return _elemlinks[i+1];
 }
 
 
@@ -2638,9 +2635,7 @@ Elem * Elem::neighbor_ptr (unsigned int i)
 {
   libmesh_assert_less (i, this->n_neighbors());
 
-  auto neighbor = _elemlinks[i+1] ? _elemlinks[i+1] : _disconnected_neighbors[i];
-
-  return neighbor;
+  return _elemlinks[i+1];
 }
 
 
