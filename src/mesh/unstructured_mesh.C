@@ -1222,8 +1222,8 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
 #endif // AMR
 
-if (!_has_prepare_disconnected_neighbors)
-  find_disconnected_neighbors();
+// if (!_has_prepare_disconnected_neighbors)
+//   find_disconnected_neighbors();
 
 #ifdef DEBUG
   MeshTools::libmesh_assert_valid_neighbors(*this,
@@ -1297,8 +1297,8 @@ void UnstructuredMesh::find_disconnected_neighbors ()
       // unsigned int rev = neigh->which_neighbor_am_i(elem);
       // libmesh_assert_less (rev, neigh->n_neighbors());
 
-          std::cout << "elem1 " << elem1->id() << " side " << (int)s1 << " proc " << elem1->processor_id()
-                    << " elem2 " << elem2->id() << " side " << (int)s2 << " proc " << elem2->processor_id() << std::endl;
+          // std::cout << "elem1 " << elem1->id() << " side " << (int)s1 << " proc " << elem1->processor_id()
+          //           << " elem2 " << elem2->id() << " side " << (int)s2 << " proc " << elem2->processor_id() << std::endl;
 
       // Check elem1
       if (elem1->processor_id() != processor_id())
@@ -1329,10 +1329,10 @@ void UnstructuredMesh::find_disconnected_neighbors ()
       // If either is local, set directly
       if (elem1->processor_id() == processor_id() || elem2->processor_id() == processor_id())
       {
-        elem1->set_neighbor(s1, elem2);
-        elem1->set_disconnected_neighbor(s1);
-        elem2->set_neighbor(s2, elem1);
-        elem2->set_disconnected_neighbor(s2);
+        // elem1->set_neighbor(s1, elem2);
+        elem1->set_disconnected_neighbor(s1, elem2);
+        // elem2->set_neighbor(s2, elem1);
+        elem2->set_disconnected_neighbor(s2, elem1);
       }
 
 
@@ -1359,10 +1359,12 @@ void UnstructuredMesh::find_disconnected_neighbors ()
             libmesh_assert(elem);
             Elem * disconnected_elem = elem_ptr(disconnected_elem_id);
             libmesh_assert(disconnected_elem);
-            elem->set_neighbor(side, disconnected_elem);
-            elem->set_disconnected_neighbor(side);
+            // elem->set_neighbor(side, disconnected_elem);
+            elem->set_disconnected_neighbor(side, disconnected_elem);
           }
       });
+
+  _has_prepare_disconnected_neighbors = true;
 }
 
 

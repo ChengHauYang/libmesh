@@ -387,7 +387,7 @@ public:
   /**
    * Marks the \f$ i^{th} \f$ neighbor as disconnected.
    */
-  void set_disconnected_neighbor(unsigned int i);
+  void set_disconnected_neighbor(unsigned int i, Elem * n);
 
   /**
    * \returns \p true if the \f$ i^{th} \f$ neighbor is disconnected,
@@ -2324,6 +2324,8 @@ protected:
    * disconnected
    */
   std::vector<bool> _has_disconnected_neighbor;
+
+  std::vector<Elem *> _disconnected_neighbors;
 };
 
 
@@ -2413,7 +2415,8 @@ Elem::Elem(const unsigned int nn,
 #endif
   _map_type(p ? p->mapping_type() : 0),
   _map_data(p ? p->mapping_data() : 0),
-  _has_disconnected_neighbor(ns, false)
+  _has_disconnected_neighbor(ns, false),
+  _disconnected_neighbors(ns, nullptr)
 {
   this->processor_id() = DofObject::invalid_processor_id;
 
@@ -2623,7 +2626,9 @@ const Elem * Elem::neighbor_ptr (unsigned int i) const
 {
   libmesh_assert_less (i, this->n_neighbors());
 
-  return _elemlinks[i+1];
+  auto neighbor = _elemlinks[i+1] ? _elemlinks[i+1] : _disconnected_neighbors[i];
+
+  return neighbor;
 }
 
 
@@ -2633,7 +2638,9 @@ Elem * Elem::neighbor_ptr (unsigned int i)
 {
   libmesh_assert_less (i, this->n_neighbors());
 
-  return _elemlinks[i+1];
+  auto neighbor = _elemlinks[i+1] ? _elemlinks[i+1] : _disconnected_neighbors[i];
+
+  return neighbor;
 }
 
 
@@ -2649,10 +2656,11 @@ void Elem::set_neighbor (const unsigned int i, Elem * n)
 
 
 inline
-void Elem::set_disconnected_neighbor(unsigned int i)
+void Elem::set_disconnected_neighbor(unsigned int i, Elem * n)
 {
   libmesh_assert_less(i, _has_disconnected_neighbor.size());
   _has_disconnected_neighbor[i] = true;
+  _disconnected_neighbors[i] = n;
 }
 
 
