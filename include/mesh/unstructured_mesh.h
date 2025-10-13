@@ -285,14 +285,6 @@ public:
                                const bool reset_current_list    = true) override;
 
 
-  /**
-   * Find and store disconnected neighbors.
-   */
-  virtual void find_disconnected_neighbors () override;
-
-  // void transfer_disconnected_neighbors_to_pointer();
-
-
 #ifdef LIBMESH_ENABLE_AMR
   /**
    * Delete subactive (i.e. children of coarsened) elements.

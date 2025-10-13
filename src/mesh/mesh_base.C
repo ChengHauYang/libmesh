@@ -64,7 +64,6 @@ MeshBase::MeshBase (const Parallel::Communicator & comm_in,
   _default_mapping_type(LAGRANGE_MAP),
   _default_mapping_data(0),
   _is_prepared   (false),
-  _has_prepare_disconnected_neighbors   (false),
   _point_locator (),
   _count_lower_dim_elems_in_point_locator(true),
   _partitioner   (),
@@ -97,7 +96,6 @@ MeshBase::MeshBase (const MeshBase & other_mesh) :
   _default_mapping_type(other_mesh._default_mapping_type),
   _default_mapping_data(other_mesh._default_mapping_data),
   _is_prepared   (other_mesh._is_prepared),
-  _has_prepare_disconnected_neighbors   (other_mesh._has_prepare_disconnected_neighbors),
   _point_locator (),
   _count_lower_dim_elems_in_point_locator(other_mesh._count_lower_dim_elems_in_point_locator),
   _partitioner   (),
@@ -2452,24 +2450,46 @@ std::string MeshBase::get_local_constraints(bool print_nonlocal) const
   return os.str();
 }
 
-void MeshBase::add_disconnected_neighbors (const std::pair<dof_id_type, unsigned int> &es1,
-                                           const std::pair<dof_id_type, unsigned int> &es2)
-{
-  // parallel_object_only();
+  void MeshBase::add_disconnected_neighbors(const ElemSide &side1,
+                                            const ElemSide &side2)
+  {
+    _disconnected_neighbors.insert(std::make_pair(side1, side2));
+  }
 
-  // An element cannot be a disconnected neighbor to itself
-  libmesh_assert_not_equal_to (es1.first, es2.first);
-  const auto * const e1 = elem_ptr(es1.first);
-  // if (e1->processor_id() == this->processor_id())
-  //   {
-      _disconnected_neighbors.emplace(es1, es2);
-      #ifdef DEBUG
-        // Make sure es2 is local or ghost
-        const auto * const e2 = elem_ptr(es2.first);
-        libmesh_assert (e2);
-      #endif
-  // }
-}
+
+ std::optional<MeshBase::ElemSide>
+  MeshBase::disconnected_neighbor(dof_id_type elem_id, unsigned int side) const
+  {
+    // Quick return if we have no disconnected neighbors
+    if (!_disconnected_neighbors.size())
+      return std::nullopt;
+
+    // Check the cache first
+    auto it = _cached_disconnected_neighbors.find({elem_id, side});
+    if (it != _cached_disconnected_neighbors.end())
+      return it->second;
+
+    for (const auto &[elemside1, elemside2] : _disconnected_neighbors)
+    {
+      const auto [elem1, side1] = elemside1;
+      const auto [elem2, side2] = elemside2;
+
+      if (elem1 == elem_id && side1 == side)
+      {
+        _cached_disconnected_neighbors.emplace(elemside1, elemside2);
+        return elemside2;
+      }
+      else if (elem2 == elem_id && side2 == side)
+      {
+        _cached_disconnected_neighbors.emplace(elemside2, elemside1);
+        return elemside1;
+      }
+    }
+
+    return std::nullopt;
+  }
+
+
 
 // Explicit instantiations for our template function
 template LIBMESH_EXPORT void

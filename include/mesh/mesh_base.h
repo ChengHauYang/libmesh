@@ -856,8 +856,6 @@ public:
   virtual void find_neighbors (const bool reset_remote_elements = false,
                                const bool reset_current_list    = true) = 0;
 
-  virtual void find_disconnected_neighbors () = 0;
-
   /**
    * Removes any orphaned nodes, nodes not connected to any elements.
    * Typically done automatically in prepare_for_use
@@ -1822,41 +1820,29 @@ public:
   const std::set<subdomain_id_type> & get_mesh_subdomains() const
   { libmesh_assert(this->is_prepared()); return _mesh_subdomains; }
 
-  /**
-   * Register a pair of elements as disconnected neighbors.
-   *
-   * \p es1 and \p es2 are pairs of (element id, side index).
-   * \p es1 is the local element side, and \p es2 is the local or semi-local element side.
-   *
-   * "Disconnected neighbors" are elements that are disconnected (without any common side)
-   * and not necessarily topologically adjacent, yet they are still considered as neighbors
-   * in the sense that functions like Elem::neighbor_ptr() are able to return the
-   * appropriate neighbor information.
-   *
-   * \note These elements only become neighbors after calling MeshBase::find_neighbors().
-   */
-  void add_disconnected_neighbors(const std::pair<dof_id_type, unsigned int> &es1,
-                                  const std::pair<dof_id_type, unsigned int> &es2);
+  using ElemSide = std::pair<dof_id_type, unsigned int>;
 
   /**
-   * \return The map of disconnected neighbors, with key being the local element side
-   * and value being the neighbor element side.
+   * Add a pair of disconnected neighbors
    */
-  const std::map<std::pair<dof_id_type, unsigned int>,
-                 std::pair<dof_id_type, unsigned int>> &
-  get_disconnected_neighbors() const { return _disconnected_neighbors; }
+  void add_disconnected_neighbors(const ElemSide &side1, const ElemSide &side2);
+
+  /**
+   * Find the disconnected neighbor for the given element and side
+   */
+  std::optional<MeshBase::ElemSide> disconnected_neighbor(dof_id_type elem_id, unsigned int side) const;
 
 protected:
 
   /**
-   * The map of disconnected neighbors with key being the local element side
-   * and value being the neighbor element side.
+   * The set of pair of disconnected neighbors
    */
-  std::map<std::pair<dof_id_type, unsigned int>,
-           std::pair<dof_id_type, unsigned int>> _disconnected_neighbors;
+  std::set<std::pair<ElemSide, ElemSide>> _disconnected_neighbors;
 
-  std::vector<std::pair<std::pair<Elem*, unsigned int>,
-              std::pair<Elem*, unsigned int>>> _disconnected_neighbors_vec;
+  /**
+   * Cache for quick lookup of disconnected neighbors
+   */
+  mutable std::map<ElemSide, ElemSide> _cached_disconnected_neighbors;
 
   /**
    * This class holds the boundary information.  It can store nodes, edges,
@@ -1932,9 +1918,6 @@ protected:
    * Flag indicating if the mesh has been prepared for use.
    */
   bool _is_prepared;
-
-
-  bool _has_prepare_disconnected_neighbors;
 
   /**
    * A \p PointLocator class for this mesh.
