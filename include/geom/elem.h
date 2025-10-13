@@ -387,7 +387,7 @@ public:
   /**
    * Marks the \f$ i^{th} \f$ neighbor as disconnected.
    */
-  void set_disconnected_neighbor(unsigned int i, Elem * n);
+  void set_disconnected_neighbor(unsigned int i);
 
   /**
    * \returns \p true if the \f$ i^{th} \f$ neighbor is disconnected,
@@ -2656,11 +2656,10 @@ void Elem::set_neighbor (const unsigned int i, Elem * n)
 
 
 inline
-void Elem::set_disconnected_neighbor(unsigned int i, Elem * n)
+void Elem::set_disconnected_neighbor(unsigned int i)
 {
   libmesh_assert_less(i, _has_disconnected_neighbor.size());
   _has_disconnected_neighbor[i] = true;
-  _disconnected_neighbors[i] = n;
 }
 
 

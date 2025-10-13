@@ -856,6 +856,9 @@ public:
   virtual void find_neighbors (const bool reset_remote_elements = false,
                                const bool reset_current_list    = true) = 0;
 
+  virtual void find_disconnected_neighbors () = 0;
+
+
   /**
    * Removes any orphaned nodes, nodes not connected to any elements.
    * Typically done automatically in prepare_for_use

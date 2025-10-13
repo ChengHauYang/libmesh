@@ -886,7 +886,7 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
   if (reset_current_list)
     for (const auto & e : this->element_ptr_range())
       for (auto s : e->side_index_range())
-        if (e->neighbor_ptr(s) != remote_elem || reset_remote_elements)
+        if (e->neighbor_ptr(s) != remote_elem || reset_remote_elements || !e->has_disconnected_neighbor(s))
           e->set_neighbor(s, nullptr);
 
   // Find neighboring elements by first finding elements
@@ -1216,28 +1216,6 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
 #endif // AMR
 
-  // Add disconnected neighbors
-  if (!_disconnected_neighbors.empty())
-  {
-    for (const auto & pair : _disconnected_neighbors)
-    {
-      const ElemSide & side1 = pair.first;
-      const ElemSide & side2 = pair.second;
-
-      Elem * elem1 = this->elem_ptr(side1.first);
-      Elem * elem2 = this->elem_ptr(side2.first);
-      const unsigned int s1 = side1.second;
-      const unsigned int s2 = side2.second;
-
-      // Safety check
-      if (!elem1 || !elem2)
-        continue;
-
-      elem1->set_neighbor(s1, elem2);
-      elem2->set_neighbor(s2, elem1);
-    }
-  }
-
 
 
 #ifdef DEBUG
@@ -1247,6 +1225,26 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 #endif
 }
 
+
+void UnstructuredMesh::find_disconnected_neighbors()
+{
+  for (const auto & pair : _disconnected_neighbors)
+    {
+      const ElemSide & side1 = pair.first;
+      const ElemSide & side2 = pair.second;
+
+      Elem * elem1 = this->elem_ptr(side1.first);
+      Elem * elem2 = this->elem_ptr(side2.first);
+      const unsigned int s1 = side1.second;
+      const unsigned int s2 = side2.second;
+
+      elem1->set_neighbor(s1, elem2);
+      elem2->set_neighbor(s2, elem1);
+
+      elem1->set_disconnected_neighbor(s1);
+      elem2->set_disconnected_neighbor(s2);
+    }
+}
 
 
 void UnstructuredMesh::read (const std::string & name,
