@@ -1228,19 +1228,15 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
 void UnstructuredMesh::find_disconnected_neighbors ()
 {
-    for (const auto & pair : _disconnected_neighbors)
+  for (const auto & [elemside1, elemside2] : _disconnected_neighbors)
     {
-      const ElemSide & side1 = pair.first;
-      const ElemSide & side2 = pair.second;
-
-      Elem * elem1 = this->elem_ptr(side1.first);
-      Elem * elem2 = this->elem_ptr(side2.first);
-      const unsigned int s1 = side1.second;
-      const unsigned int s2 = side2.second;
-
+      const auto & [eid1, s1] = elemside1;
+      const auto & [eid2, s2] = elemside2;
+      Elem * elem1 = elem_ptr(eid1);
+      Elem * elem2 = elem_ptr(eid2);
       elem1->set_neighbor(s1, elem2);
-      elem2->set_neighbor(s2, elem1);
       elem1->set_disconnected_neighbor(s1);
+      elem2->set_neighbor(s2, elem1);
       elem2->set_disconnected_neighbor(s2);
     }
 

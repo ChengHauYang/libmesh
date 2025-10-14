@@ -1825,17 +1825,31 @@ public:
   using ElemSide = std::pair<dof_id_type, unsigned int>;
 
   /**
-   * Add a pair of disconnected neighbors
+   * Register a pair of elements as disconnected neighbors.
+   *
+   * \p es1 and \p es2 are pairs of (element id, side index).
+   *
+   * "Disconnected neighbors" are elements that are disconnected (without any common side)
+   * and not necessarily topologically adjacent, yet they are still considered as neighbors
+   * in the sense that functions like Elem::neighbor_ptr() are able to return the
+   * appropriate neighbor information.
+   *
+   * \note These elements only become neighbors after calling UnstructuredMesh::find_disconnected_neighbors().
+   * \note The current processor must have access to the element pointers for both elements.
    */
-  void add_disconnected_neighbors(const ElemSide &side1, const ElemSide &side2);
+  void add_disconnected_neighbors (const std::pair<dof_id_type, unsigned int> &es1,
+                                   const std::pair<dof_id_type, unsigned int> &es2);
+
 
 
 protected:
 
   /**
-   * The set of pair of disconnected neighbors
+   * The map of disconnected neighbors with key being the local element side
+   * and value being the neighbor element side.
    */
-  std::set<std::pair<ElemSide, ElemSide>> _disconnected_neighbors;
+  std::map<std::pair<dof_id_type, unsigned int>,
+           std::pair<dof_id_type, unsigned int>> _disconnected_neighbors;
 
   /**
    * This class holds the boundary information.  It can store nodes, edges,
