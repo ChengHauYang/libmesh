@@ -887,7 +887,10 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
     for (const auto & e : this->element_ptr_range())
       for (auto s : e->side_index_range())
         if (e->neighbor_ptr(s) != remote_elem || reset_remote_elements)
-          e->set_neighbor(s, nullptr);
+          if (!e->has_disconnected_neighbor(s))
+            {
+              e->set_neighbor(s, nullptr);
+            }
 
   // Find neighboring elements by first finding elements
   // with identical side keys and then check to see if they
@@ -1216,9 +1219,15 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
 #endif // AMR
 
-  // Add disconnected neighbors
-  if (!_disconnected_neighbors.empty())
-  {
+#ifdef DEBUG
+  MeshTools::libmesh_assert_valid_neighbors(*this,
+                                            !reset_remote_elements);
+  MeshTools::libmesh_assert_valid_amr_interior_parents(*this);
+#endif
+}
+
+void UnstructuredMesh::find_disconnected_neighbors ()
+{
     for (const auto & pair : _disconnected_neighbors)
     {
       const ElemSide & side1 = pair.first;
@@ -1229,22 +1238,13 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
       const unsigned int s1 = side1.second;
       const unsigned int s2 = side2.second;
 
-      // Safety check
-      if (!elem1 || !elem2)
-        continue;
-
       elem1->set_neighbor(s1, elem2);
       elem2->set_neighbor(s2, elem1);
+      elem1->set_disconnected_neighbor(s1);
+      elem2->set_disconnected_neighbor(s2);
     }
-  }
 
-
-
-#ifdef DEBUG
-  MeshTools::libmesh_assert_valid_neighbors(*this,
-                                            !reset_remote_elements);
-  MeshTools::libmesh_assert_valid_amr_interior_parents(*this);
-#endif
+    _disconnected_neighbors.clear();
 }
 
 

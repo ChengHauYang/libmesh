@@ -856,6 +856,8 @@ public:
   virtual void find_neighbors (const bool reset_remote_elements = false,
                                const bool reset_current_list    = true) = 0;
 
+  virtual void find_disconnected_neighbors () = 0;
+
   /**
    * Removes any orphaned nodes, nodes not connected to any elements.
    * Typically done automatically in prepare_for_use
@@ -1827,10 +1829,6 @@ public:
    */
   void add_disconnected_neighbors(const ElemSide &side1, const ElemSide &side2);
 
-  /**
-   * Find the disconnected neighbor for the given element and side
-   */
-  std::optional<MeshBase::ElemSide> disconnected_neighbor(dof_id_type elem_id, unsigned int side) const;
 
 protected:
 
@@ -1838,11 +1836,6 @@ protected:
    * The set of pair of disconnected neighbors
    */
   std::set<std::pair<ElemSide, ElemSide>> _disconnected_neighbors;
-
-  /**
-   * Cache for quick lookup of disconnected neighbors
-   */
-  mutable std::map<ElemSide, ElemSide> _cached_disconnected_neighbors;
 
   /**
    * This class holds the boundary information.  It can store nodes, edges,
