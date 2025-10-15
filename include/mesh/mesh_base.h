@@ -856,7 +856,7 @@ public:
   virtual void find_neighbors (const bool reset_remote_elements = false,
                                const bool reset_current_list    = true) = 0;
 
-  virtual void find_disconnected_neighbors () = 0;
+  // virtual void find_disconnected_neighbors () = 0;
 
   /**
    * Removes any orphaned nodes, nodes not connected to any elements.
@@ -1825,31 +1825,18 @@ public:
   using ElemSide = std::pair<dof_id_type, unsigned int>;
 
   /**
-   * Register a pair of elements as disconnected neighbors.
-   *
-   * \p es1 and \p es2 are pairs of (element id, side index).
-   *
-   * "Disconnected neighbors" are elements that are disconnected (without any common side)
-   * and not necessarily topologically adjacent, yet they are still considered as neighbors
-   * in the sense that functions like Elem::neighbor_ptr() are able to return the
-   * appropriate neighbor information.
-   *
-   * \note These elements only become neighbors after calling UnstructuredMesh::find_disconnected_neighbors().
-   * \note The current processor must have access to the element pointers for both elements.
+   * Register a pair of boundaries as disconnected boundaries.
    */
-  void add_disconnected_neighbors (const std::pair<dof_id_type, unsigned int> &es1,
-                                   const std::pair<dof_id_type, unsigned int> &es2);
+  void add_disconnected_boundaries (const boundary_id_type b1,
+                                    const boundary_id_type b2)
+  { _boundary_id_pairs.emplace(b1, b2); }
 
 
 
 protected:
 
-  /**
-   * The map of disconnected neighbors with key being the local element side
-   * and value being the neighbor element side.
-   */
-  std::map<std::pair<dof_id_type, unsigned int>,
-           std::pair<dof_id_type, unsigned int>> _disconnected_neighbors;
+  /// @brief a map of pairs of boundary ids between which new boundary sides are created
+  std::unordered_map<boundary_id_type, boundary_id_type> _boundary_id_pairs;
 
   /**
    * This class holds the boundary information.  It can store nodes, edges,

@@ -306,6 +306,23 @@ public:
    */
   bool topologically_equal (const Elem & rhs) const;
 
+
+  /**
+   * \returns \p true if two elements occupy the same geometric region
+   * within a given tolerance, \p false otherwise.
+   *
+   * Two elements are geometrically equal if they have:
+   *  - The same dimension, element type, and number of nodes;
+   *  - Centroids that coincide within the specified tolerance;
+   *  - Node coordinates that match within the tolerance, regardless
+   *    of node IDs or ordering.
+   *
+   * This function compares spatial coordinates rather than connectivity,
+   * making it suitable for detecting coincident or disconnected elements
+   * that share identical geometry but differ in node numbering.
+   */
+  bool geometrically_equal (const Elem & rhs, const Real tol = TOLERANCE) const;
+
   /**
    * \returns A const pointer to the \f$ i^{th} \f$ neighbor of this
    * element, or \p nullptr if \p MeshBase::find_neighbors() has not been
@@ -383,17 +400,6 @@ public:
    * of this element, \p false otherwise.
    */
   bool has_neighbor (const Elem * elem) const;
-
-  /**
-   * Marks the \f$ i^{th} \f$ neighbor as disconnected.
-   */
-  void set_disconnected_neighbor(unsigned int i);
-
-  /**
-   * \returns \p true if the \f$ i^{th} \f$ neighbor is disconnected,
-   * \p false otherwise.
-   */
-  bool has_disconnected_neighbor(unsigned int i) const;
 
   /**
    * \returns If \p elem is a neighbor of a child of this element, a
@@ -2313,12 +2319,6 @@ protected:
    * RATIONAL_BERNSTEIN nodal weight data index.
    */
   unsigned char _map_data;
-
-  /**
-   * Vector of flags indicating whether each neighbor is known to be
-   * disconnected
-   */
-  std::vector<bool> _has_disconnected_neighbor;
 };
 
 
@@ -2407,8 +2407,7 @@ Elem::Elem(const unsigned int nn,
   _p_level(0),
 #endif
   _map_type(p ? p->mapping_type() : 0),
-  _map_data(p ? p->mapping_data() : 0),
-  _has_disconnected_neighbor(ns, false)
+  _map_data(p ? p->mapping_data() : 0)
 {
   this->processor_id() = DofObject::invalid_processor_id;
 
@@ -2651,22 +2650,6 @@ bool Elem::has_neighbor (const Elem * elem) const
       return true;
 
   return false;
-}
-
-inline
-void Elem::set_disconnected_neighbor(unsigned int i)
-{
-  libmesh_assert_less(i, _has_disconnected_neighbor.size());
-  _has_disconnected_neighbor[i] = true;
-}
-
-
-
-inline
-bool Elem::has_disconnected_neighbor(unsigned int i) const
-{
-  libmesh_assert_less(i, _has_disconnected_neighbor.size());
-  return _has_disconnected_neighbor[i];
 }
 
 

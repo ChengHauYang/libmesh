@@ -287,7 +287,7 @@ public:
   /**
    * Find and store disconnected neighbors.
    */
-  virtual void find_disconnected_neighbors () override;
+  // virtual void find_disconnected_neighbors () override;
 
 #ifdef LIBMESH_ENABLE_AMR
   /**

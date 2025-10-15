@@ -47,6 +47,9 @@
 #include <sstream>
 #include <unordered_map>
 
+// TIMPI includes
+#include "timpi/parallel_implementation.h"
+#include "timpi/parallel_sync.h"
 namespace {
 
 using namespace libMesh;
@@ -887,10 +890,7 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
     for (const auto & e : this->element_ptr_range())
       for (auto s : e->side_index_range())
         if (e->neighbor_ptr(s) != remote_elem || reset_remote_elements)
-          if (!e->has_disconnected_neighbor(s))
-            {
-              e->set_neighbor(s, nullptr);
-            }
+            e->set_neighbor(s, nullptr);
 
   // Find neighboring elements by first finding elements
   // with identical side keys and then check to see if they
@@ -995,6 +995,214 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
           }
       }
   }
+
+
+// {
+//   // Pull objects out of the loop to reduce heap operations
+//   std::unique_ptr<Elem> this_side, other_side;
+
+//   for (const auto & element : this->element_ptr_range())
+//     {
+//       for (auto ms : element->side_index_range())
+//         {
+//         next_side_check:
+//           // If we haven't yet found a neighbor on this side, try.
+//           if (element->neighbor_ptr(ms) == nullptr ||
+//               element->neighbor_ptr(ms) == remote_elem)
+//             {
+//               // collect boundary ids
+//               std::vector<boundary_id_type> bc_ids;
+//               this->get_boundary_info().boundary_ids(element, ms, bc_ids);
+//               if (bc_ids.empty())
+//                 continue;
+
+//                 boundary_id_type current_bnd_id = invalid_uint;
+//                 boundary_id_type paired_id = invalid_uint;
+//                 for (auto id : bc_ids)
+//                   {
+//                     auto it = _boundary_id_pairs.find(id);
+//                     if (it == _boundary_id_pairs.end())
+//                       {
+//                         // this side is not a paired boundary, skip it
+//                         continue;
+//                       }
+//                     current_bnd_id = id;
+//                     paired_id = it->second;
+//                   }
+
+//               // Build the side for this element
+//               element->side_ptr(this_side, ms);
+
+
+//               // Loop through all elements to find geometrically identical sides
+//               for (const auto & other_elem : this->element_ptr_range())
+//                 {
+//                   if (other_elem == element)
+//                     continue;
+
+//                   for (auto ns : other_elem->side_index_range())
+//                     {
+//                       // Skip if the other element already has a neighbor
+//                       if (other_elem->neighbor_ptr(ns) != nullptr &&
+//                           other_elem->neighbor_ptr(ns) != remote_elem)
+//                         continue;
+
+//                       std::vector<boundary_id_type> bc_ids_neigh;
+//                       this->get_boundary_info().boundary_ids(other_elem, ns, bc_ids_neigh);
+
+//                       if (bc_ids_neigh.empty())
+//                         continue;
+
+//                       if (current_bnd_id != paired_id)
+//                         {
+//                           if (std::find(bc_ids_neigh.begin(), bc_ids_neigh.end(), paired_id) == bc_ids_neigh.end())
+//                               continue;
+//                         }
+
+//                       other_elem->side_ptr(other_side, ns);
+
+//                       // Check geometric equality
+//                       if (this_side->geometrically_equal(*other_side))
+//                         {
+//                           std::cout << "find disconnected neighbors "
+//                                     << element->id() << " side " << ms
+//                                     << " and "
+//                                     << other_elem->id() << " side " << ns
+//                                     << std::endl;
+
+//                           std::cout << "element centroid = ";
+//                           element->vertex_average().print(std::cout);
+//                           std::cout << std::endl;
+
+//                           element->set_neighbor(ms, other_elem);
+//                           other_elem->set_neighbor(ns, element);
+
+//                           // get out of this nested crap
+//                           goto next_side_check;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+
+{
+  // Build or obtain a point locator (sub-locator) and initialize it
+  std::unique_ptr<PointLocatorBase> point_locator = this->sub_point_locator();
+
+  // Get a reference to the boundary info object for convenience
+  auto & bi = this->get_boundary_info();
+
+  // Helper lambda: extract the first valid (current_id, paired_id) pair
+  // from _boundary_id_pairs for a given element side.
+  // Returns true if a valid pair is found, otherwise false.
+  auto pick_paired_id = [this, &bi](const Elem * e, unsigned int side,
+                                    boundary_id_type &current_id,
+                                    boundary_id_type &paired_id) -> bool
+  {
+    std::vector<boundary_id_type> ids;
+    bi.boundary_ids(e, side, ids);
+    for (auto id : ids)
+    {
+      auto it = _boundary_id_pairs.find(id);
+      if (it != _boundary_id_pairs.end())
+      {
+        current_id = id;
+        paired_id  = it->second;
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Main loop: iterate over all elements and their sides to find disconnected neighbors
+  for (const auto & element : this->element_ptr_range())
+  {
+    for (auto ms : element->side_index_range())
+    {
+      // Skip if this side already has a valid neighbor (including remote neighbors)
+      if (element->neighbor_ptr(ms) != nullptr &&
+          element->neighbor_ptr(ms) != remote_elem)
+        continue;
+
+      // Determine whether this side belongs to a paired (disconnected) boundary
+      boundary_id_type current_id;
+      boundary_id_type paired_id;
+      if (!pick_paired_id(element, ms, current_id, paired_id))
+        continue; // No valid pair found, skip this side
+
+      // Build the geometry of this side
+      std::unique_ptr<const Elem> this_side;
+      element->build_side_ptr(this_side, ms);
+
+      // Compute centroid and approximate element size
+      const Point c_mid  = this_side->vertex_average();
+
+      // Use the point locator to find candidate elements near the side centroid
+      std::set<const Elem *> const_candidate_elements;
+      point_locator->operator()(c_mid, const_candidate_elements);
+
+      std::set<Elem *> candidate_elements;
+      for (auto ce : const_candidate_elements)
+          candidate_elements.insert(this->elem_ptr(ce->id()));
+
+      bool paired_found = false; // Flag to mark if a valid match was found
+
+      // Loop through candidate elements to look for potential paired neighbors
+      for (auto * cand_elem : candidate_elements)
+        {
+          std::cout << "  candidate element " << cand_elem->id() << std::endl;
+          if (!cand_elem || cand_elem == element)
+            continue;
+
+          std::vector<unsigned int> cand_neigh_sides =
+            (paired_id == current_id) ?
+              std::vector<unsigned int>(cand_elem->side_index_range().begin(),
+                                    cand_elem->side_index_range().end()) :
+              bi.sides_with_boundary_id(cand_elem, paired_id);
+
+          if (cand_neigh_sides.empty())
+            continue;
+
+          // Compare each candidate side to the current one
+          for (auto ns : cand_neigh_sides)
+            {
+              // Skip if this side already has a valid (non-remote) neighbor
+              if (cand_elem->neighbor_ptr(ns) != nullptr &&
+                  cand_elem->neighbor_ptr(ns) != remote_elem)
+                continue;
+
+              // Build the geometry of the candidate side
+              std::unique_ptr<const Elem> cand_side;
+              cand_elem->build_side_ptr(cand_side, ns);
+
+              // Check geometric equality
+              if (this_side->geometrically_equal(*cand_side))
+                {
+                  std::cout << "find disconnected neighbors "
+                            << element->id() << " side " << ms
+                            << " and "
+                            << cand_elem->id() << " side " << ns
+                            << std::endl;
+
+                  std::cout << "element centroid = ";
+                  element->vertex_average().print(std::cout);
+                  std::cout << std::endl;
+
+                  element->set_neighbor(ms, cand_elem);
+                  cand_elem->set_neighbor(ns, element);
+                  paired_found = true;
+                }
+            }
+
+          if (paired_found)
+            break; // Stop searching through other candidates
+        }
+    }
+  }
+}
+
 
 #ifdef LIBMESH_ENABLE_AMR
 
@@ -1226,22 +1434,52 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 #endif
 }
 
-void UnstructuredMesh::find_disconnected_neighbors ()
-{
-  for (const auto & [elemside1, elemside2] : _disconnected_neighbors)
-    {
-      const auto & [eid1, s1] = elemside1;
-      const auto & [eid2, s2] = elemside2;
-      Elem * elem1 = elem_ptr(eid1);
-      Elem * elem2 = elem_ptr(eid2);
-      elem1->set_neighbor(s1, elem2);
-      elem1->set_disconnected_neighbor(s1);
-      elem2->set_neighbor(s2, elem1);
-      elem2->set_disconnected_neighbor(s2);
-    }
+// void UnstructuredMesh::find_disconnected_neighbors ()
+// {
+//   using ElemSideDisconnectedElemTuple = std::tuple<dof_id_type, unsigned int, dof_id_type>; // (elem_id, side, disconnected_elem_id)
+//   std::map<processor_id_type, std::vector<ElemSideDisconnectedElemTuple>> to_other_procs;
+//   for (const auto & [elemside1, elemside2] : _disconnected_neighbors)
+//     {
+//       const auto & [eid1, s1] = elemside1;
+//       const auto & [eid2, s2] = elemside2;
+//       Elem * elem1 = elem_ptr(eid1);
+//       Elem * elem2 = elem_ptr(eid2);
+//       elem1->set_neighbor(s1, elem2);
+//       elem1->set_disconnected_neighbor(s1);
+//       elem2->set_neighbor(s2, elem1);
+//       elem2->set_disconnected_neighbor(s2);
+//       for (processor_id_type pid = 0; pid < n_processors(); ++pid)
+//           if (pid != processor_id())
+//             {
+//                 to_other_procs[pid].emplace_back(eid1, s1, eid2);
+//                 to_other_procs[pid].emplace_back(eid2, s2, eid1);
+//             }
+//     }
 
-    _disconnected_neighbors.clear();
-}
+//     Parallel::push_parallel_vector_data(
+//     comm(),
+//     to_other_procs,
+//     [&](processor_id_type, const std::vector<ElemSideDisconnectedElemTuple> & recv_data)
+//       {
+//         for (const auto & tuple : recv_data)
+//           {
+//             const auto elem_id = std::get<0>(tuple);
+//             const auto side = std::get<1>(tuple);
+//             const auto disconnected_elem_id = std::get<2>(tuple);
+
+//             Elem * elem = elem_ptr(elem_id);
+//             Elem * disconnected_elem = elem_ptr(disconnected_elem_id);
+
+//             if (elem && disconnected_elem)
+//               {
+//                 elem->set_neighbor(side, disconnected_elem);
+//                 elem->set_disconnected_neighbor(side);
+//               }
+//           }
+//       });
+
+//     _disconnected_neighbors.clear();
+// }
 
 
 

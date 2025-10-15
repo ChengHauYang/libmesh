@@ -2450,20 +2450,6 @@ std::string MeshBase::get_local_constraints(bool print_nonlocal) const
   return os.str();
 }
 
-void MeshBase::add_disconnected_neighbors (const std::pair<dof_id_type, unsigned int> &es1,
-                                           const std::pair<dof_id_type, unsigned int> &es2)
-  {
-      // An element cannot be a disconnected neighbor to itself
-      libmesh_assert_not_equal_to (es1.first, es2.first);
-
-      // Ensure that the processor owns the element pointers before proceeding
-      libmesh_assert(this->elem_ptr(es1.first));
-      libmesh_assert(this->elem_ptr(es2.first));
-
-      _disconnected_neighbors.emplace(es1, es2);
-  }
-
-
 // Explicit instantiations for our template function
 template LIBMESH_EXPORT void
 MeshBase::copy_constraint_rows(const SparseMatrix<Real> & constraint_operator,
