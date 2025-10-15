@@ -284,11 +284,6 @@ public:
   virtual void find_neighbors (const bool reset_remote_elements = false,
                                const bool reset_current_list    = true) override;
 
-  /**
-   * Find and store disconnected neighbors.
-   */
-  // virtual void find_disconnected_neighbors () override;
-
 #ifdef LIBMESH_ENABLE_AMR
   /**
    * Delete subactive (i.e. children of coarsened) elements.
