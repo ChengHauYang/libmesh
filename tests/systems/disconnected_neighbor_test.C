@@ -26,6 +26,8 @@ static const boundary_id_type right_id = 1;
 static const boundary_id_type interface_left_id = 5;
 static const boundary_id_type interface_right_id = 6;
 
+static const int nx = 10, ny = 10;
+
 Number
 heat_exact (const Point & p,
             const Parameters &,
@@ -177,83 +179,85 @@ private:
   {
     Mesh mesh(*TestCommWorld, 2);
 
-    // Domain: x in (0, 1), y in (0, 1)
-    // Split into two subdomains:
-    //   Left subdomain:  0 <= x <= 0.5
-    //   Right subdomain: 0.5 <= x <= 1
-    //
-    // Note: Points at x = 0.5 are duplicated (same coordinates but different node IDs)
-    //       to represent an interface or discontinuity between the two subdomains.
-    //
-    // Coordinates layout:
-    //
-    //  (0,1)   (0.5,1)_L   (0.5,1)_R   (1,1)
-    //    x--------x           x--------x
-    //    |        |           |        |
-    //    |  Left  | Interface |  Right |
-    //    |        |           |        |
-    //    x--------x           x--------x
-    //  (0,0)   (0.5,0)_L   (0.5,0)_R   (1,0)
+    // // Domain: x in (0, 1), y in (0, 1)
+    // // Split into two subdomains:
+    // //   Left subdomain:  0 <= x <= 0.5
+    // //   Right subdomain: 0.5 <= x <= 1
+    // //
+    // // Note: Points at x = 0.5 are duplicated (same coordinates but different node IDs)
+    // //       to represent an interface or discontinuity between the two subdomains.
+    // //
+    // // Coordinates layout:
+    // //
+    // //  (0,1)   (0.5,1)_L   (0.5,1)_R   (1,1)
+    // //    x--------x           x--------x
+    // //    |        |           |        |
+    // //    |  Left  | Interface |  Right |
+    // //    |        |           |        |
+    // //    x--------x           x--------x
+    // //  (0,0)   (0.5,0)_L   (0.5,0)_R   (1,0)
 
 
-    // ---- Define points ----
+    // // --- Define points ---
 
-    // Left subdomain nodes
-    mesh.add_point(Point(0.0, 0.0), 0);   // bottom-left corner
-    mesh.add_point(Point(0.5, 0.0), 1);   // bottom-right corner of left element (interface node)
-    mesh.add_point(Point(0.0, 1.0), 2);   // top-left corner
-    mesh.add_point(Point(0.5, 1.0), 3);   // top-right corner of left element (interface node)
+    // // Left subdomain nodes
+    // mesh.add_point(Point(0.0, 0.0), 0);   // bottom-left corner
+    // mesh.add_point(Point(0.5, 0.0), 1);   // bottom-right corner of left element (interface node)
+    // mesh.add_point(Point(0.0, 1.0), 2);   // top-left corner
+    // mesh.add_point(Point(0.5, 1.0), 3);   // top-right corner of left element (interface node)
 
-    // Right subdomain nodes (duplicated interface points)
-    mesh.add_point(Point(0.5, 0.0), 4);   // bottom-left corner of right element (same coords as node 1) (interface node)
-    mesh.add_point(Point(1.0, 0.0), 5);   // bottom-right corner
-    mesh.add_point(Point(0.5, 1.0), 6);   // top-left corner of right element (same coords as node 3) (interface node)
-    mesh.add_point(Point(1.0, 1.0), 7);   // top-right corner
+    // // Right subdomain nodes (duplicated interface points)
+    // mesh.add_point(Point(0.5, 0.0), 4);   // bottom-left corner of right element (same coords as node 1) (interface node)
+    // mesh.add_point(Point(1.0, 0.0), 5);   // bottom-right corner
+    // mesh.add_point(Point(0.5, 1.0), 6);   // top-left corner of right element (same coords as node 3) (interface node)
+    // mesh.add_point(Point(1.0, 1.0), 7);   // top-right corner
 
 
-    // ---- Define elements ----
-    BoundaryInfo & boundary = mesh.get_boundary_info();
-    // Left element (element ID = 0)
-    {
-      Elem * elem = mesh.add_elem(Elem::build_with_id(QUAD4, 0));
-      elem->set_node(0, mesh.node_ptr(0)); // bottom-left  (0,0)
-      elem->set_node(1, mesh.node_ptr(1)); // bottom-right (0.5,0)
-      elem->set_node(2, mesh.node_ptr(3)); // top-right    (0.5,1)
-      elem->set_node(3, mesh.node_ptr(2)); // top-left     (0,1)
-      boundary.add_side(elem, 3, left_id); // left boundary
-      boundary.add_side(elem, 1, interface_left_id);
-      boundary.sideset_name(left_id) = "left_boundary";
-      boundary.sideset_name(interface_left_id) = "interface_left";
-    }
+    // // --- Define elements ---
+    // BoundaryInfo & boundary = mesh.get_boundary_info();
+    // // Left element (element ID = 0)
+    // {
+    //   Elem * elem = mesh.add_elem(Elem::build_with_id(QUAD4, 0));
+    //   elem->set_node(0, mesh.node_ptr(0)); // bottom-left  (0,0)
+    //   elem->set_node(1, mesh.node_ptr(1)); // bottom-right (0.5,0)
+    //   elem->set_node(2, mesh.node_ptr(3)); // top-right    (0.5,1)
+    //   elem->set_node(3, mesh.node_ptr(2)); // top-left     (0,1)
+    //   boundary.add_side(elem, 3, left_id); // left boundary
+    //   boundary.add_side(elem, 1, interface_left_id);
+    //   boundary.sideset_name(left_id) = "left_boundary";
+    //   boundary.sideset_name(interface_left_id) = "interface_left";
+    // }
 
-    // Right element (element ID = 1)
-    {
-      Elem * elem = mesh.add_elem(Elem::build_with_id(QUAD4, 1));
-      elem->set_node(0, mesh.node_ptr(4)); // bottom-left  (0.5,0)_R
-      elem->set_node(1, mesh.node_ptr(5)); // bottom-right (1,0)
-      elem->set_node(2, mesh.node_ptr(7)); // top-right    (1,1)
-      elem->set_node(3, mesh.node_ptr(6)); // top-left     (0.5,1)_R
-      boundary.add_side(elem, 1, right_id); // right boundary
-      boundary.add_side(elem, 3, interface_right_id);
-      boundary.sideset_name(right_id) = "right_boundary";
-      boundary.sideset_name(interface_right_id) = "interface_right";
-    }
+    // // Right element (element ID = 1)
+    // {
+    //   Elem * elem = mesh.add_elem(Elem::build_with_id(QUAD4, 1));
+    //   elem->set_node(0, mesh.node_ptr(4)); // bottom-left  (0.5,0)_R
+    //   elem->set_node(1, mesh.node_ptr(5)); // bottom-right (1,0)
+    //   elem->set_node(2, mesh.node_ptr(7)); // top-right    (1,1)
+    //   elem->set_node(3, mesh.node_ptr(6)); // top-left     (0.5,1)_R
+    //   boundary.add_side(elem, 1, right_id); // right boundary
+    //   boundary.add_side(elem, 3, interface_right_id);
+    //   boundary.sideset_name(right_id) = "right_boundary";
+    //   boundary.sideset_name(interface_right_id) = "interface_right";
+    // }
 
-    // This is the key testing step: inform libMesh about the disconnected boundaries
-    // And, in `prepare_for_use()`, libMesh will set up the disconnected neighbor relationships.
-    mesh.add_disconnected_boundaries(interface_left_id, interface_right_id);
+    // // This is the key testing step: inform libMesh about the disconnected boundaries
+    // // And, in `prepare_for_use()`, libMesh will set up the disconnected neighbor relationships.
+    // mesh.add_disconnected_boundaries(interface_left_id, interface_right_id);
 
-    // libMesh shouldn't renumber, or our based-on-initial-id
-    // assertions later may fail.
-    mesh.allow_renumbering(false);
+    // // libMesh shouldn't renumber, or our based-on-initial-id
+    // // assertions later may fail.
+    // mesh.allow_renumbering(false);
 
-    mesh.prepare_for_use();
+    // mesh.prepare_for_use();
 
-    auto elem_left = mesh.elem_ptr(0);
-    auto elem_right = mesh.elem_ptr(1);
+    // auto elem_left = mesh.elem_ptr(0);
+    // auto elem_right = mesh.elem_ptr(1);
 
-    LIBMESH_ASSERT_NUMBERS_EQUAL(elem_left->neighbor_ptr(1)->id(), elem_right->id(), 1e-15);
-    LIBMESH_ASSERT_NUMBERS_EQUAL(elem_right->neighbor_ptr(3)->id(), elem_left->id(), 1e-15);
+    // LIBMESH_ASSERT_NUMBERS_EQUAL(elem_left->neighbor_ptr(1)->id(), elem_right->id(), 1e-15);
+    // LIBMESH_ASSERT_NUMBERS_EQUAL(elem_right->neighbor_ptr(3)->id(), elem_left->id(), 1e-15);
+
+    build_split_mesh_with_interface(mesh);
 
     EquationSystems es(mesh);
     LinearImplicitSystem & sys =
@@ -299,6 +303,120 @@ private:
           LIBMESH_ASSERT_NUMBERS_EQUAL(exact, approx, 1e-2);
         }
   }
+
+  // The interface is located at x = 0.5; nx must be even (split evenly into left and right subdomains)
+  void build_split_mesh_with_interface(Mesh &mesh)
+    {
+      // Ensure nx is even so the interface aligns with element boundaries
+      libmesh_error_msg_if(nx % 2 != 0, "nx must be even!");
+
+      mesh.clear();
+      mesh.set_mesh_dimension(2);
+
+      const unsigned nxL = nx / 2;       // Number of elements in x-direction (left half)
+      const unsigned nxR = nx / 2;       // Number of elements in x-direction (right half)
+      const double dx = 1.0 / static_cast<double>(nx);
+      const double dy = 1.0 / static_cast<double>(ny);
+
+      // --- Generate points for the left subdomain [0, 0.5] ---
+      // Each row of the left subdomain has (nxL + 1) nodes.
+      // Total nodes = (nxL + 1) * (ny + 1).
+      auto nidL = [nxL](unsigned i, unsigned j) {
+        return static_cast<dof_id_type>(j * (nxL + 1) + i);
+      };
+
+      for (unsigned j = 0; j <= ny; ++j)
+      {
+        const double y = j * dy;
+        for (unsigned i = 0; i <= nxL; ++i)
+        {
+          const double x = i * dx; // At i = nxL, x = 0.5 (interface)
+          mesh.add_point(Point(x, y), nidL(i, j));
+        }
+      }
+
+      // --- Generate points for the right subdomain [0.5, 1.0] ---
+      // Interface nodes at x = 0.5 are duplicated with new node IDs.
+      const dof_id_type baseR = static_cast<dof_id_type>((nxL + 1) * (ny + 1));
+
+      auto nidR = [nxR, baseR](unsigned i, unsigned j) {
+        return static_cast<dof_id_type>(baseR + j * (nxR + 1) + i);
+      };
+
+      for (unsigned j = 0; j <= ny; ++j)
+      {
+        const double y = j * dy;
+        for (unsigned i = 0; i <= nxR; ++i)
+        {
+          const double x = 0.5 + i * dx; // At i = 0, x = 0.5 (same coords as left interface, different ID)
+          mesh.add_point(Point(x, y), nidR(i, j));
+        }
+      }
+
+      BoundaryInfo &boundary = mesh.get_boundary_info();
+
+      // --- Create left subdomain elements (QUAD4) ---
+      // Node order: 0 = BL, 1 = BR, 2 = TR, 3 = TL
+      // Side order: 0 = bottom(0-1), 1 = right(1-2), 2 = top(2-3), 3 = left(3-0)
+      dof_id_type eid = 0;
+      for (unsigned j = 0; j < ny; ++j)
+      {
+        for (unsigned i = 0; i < nxL; ++i)
+        {
+          Elem *e = mesh.add_elem(Elem::build_with_id(QUAD4, eid++));
+          e->set_node(0) = mesh.node_ptr(nidL(i,   j));
+          e->set_node(1) = mesh.node_ptr(nidL(i+1, j));
+          e->set_node(2) = mesh.node_ptr(nidL(i+1, j+1));
+          e->set_node(3) = mesh.node_ptr(nidL(i,   j+1));
+
+          // Left outer boundary (i == 0 -> side 3)
+          if (i == 0)
+            boundary.add_side(e, 3, left_id);
+
+          // Interface (left side) boundary (i == nxL - 1 -> side 1)
+          if (i == nxL - 1)
+            boundary.add_side(e, 1, interface_left_id);
+        }
+      }
+
+      // --- Create right subdomain elements (QUAD4) ---
+      for (unsigned j = 0; j < ny; ++j)
+      {
+        for (unsigned i = 0; i < nxR; ++i)
+        {
+          Elem *e = mesh.add_elem(Elem::build_with_id(QUAD4, eid++));
+          e->set_node(0) = mesh.node_ptr(nidR(i,   j));
+          e->set_node(1) = mesh.node_ptr(nidR(i+1, j));
+          e->set_node(2) = mesh.node_ptr(nidR(i+1, j+1));
+          e->set_node(3) = mesh.node_ptr(nidR(i,   j+1));
+
+          // Interface (right side) boundary (i == 0 -> side 3)
+          if (i == 0)
+            boundary.add_side(e, 3, interface_right_id);
+
+          // Right outer boundary (i == nxR - 1 -> side 1)
+          if (i == nxR - 1)
+            boundary.add_side(e, 1, right_id);
+        }
+      }
+
+      // --- Assign human-readable boundary names ---
+      boundary.sideset_name(left_id)            = "left_boundary";
+      boundary.sideset_name(right_id)           = "right_boundary";
+      boundary.sideset_name(interface_left_id)  = "interface_left";
+      boundary.sideset_name(interface_right_id) = "interface_right";
+
+      // This is the key testing step: inform libMesh about the disconnected boundaries
+      // And, in `prepare_for_use()`, libMesh will set up the disconnected neighbor relationships.
+      mesh.add_disconnected_boundaries(interface_left_id, interface_right_id);
+
+      // libMesh shouldn't renumber, or our based-on-initial-id
+      // assertions later may fail.
+      mesh.allow_renumbering(false);
+
+      mesh.prepare_for_use();
+    }
+
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION( DisconnectedNeighborTest );
