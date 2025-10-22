@@ -82,8 +82,8 @@ const Elem * PeriodicBoundaries::neighbor(boundary_id_type boundary_id,
   for(const Elem * elem_it : candidate_elements)
     {
 
-      if (elem_it == e) // skip self
-        continue;
+      // if (elem_it == e) // skip self
+      //   continue;
 
       std::vector<unsigned int> neigh_sides =
         mesh.get_boundary_info().sides_with_boundary_id(elem_it, b->pairedboundary);

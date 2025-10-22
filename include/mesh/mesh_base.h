@@ -1829,7 +1829,7 @@ public:
    * Register a pair of boundaries as disconnected boundaries.
    */
   void add_disconnected_boundaries(const boundary_id_type b1,
-                                  const boundary_id_type b2)
+                                   const boundary_id_type b2)
     {
       // Lazily allocate the container the first time it’s needed
       if (!_disconnected_boundary_pairs)

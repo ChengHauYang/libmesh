@@ -994,6 +994,7 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
   }
 
 #ifdef LIBMESH_ENABLE_PERIODIC
+  // Get the disconnected boundaries object (from periodic BCs)
   auto * db = this->get_disconnected_boundaries();
 
   if (db)
@@ -1001,8 +1002,7 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
       // Obtain a point locator
       std::unique_ptr<PointLocatorBase> point_locator = this->sub_point_locator();
 
-      // Get the disconnected boundaries object (from periodic BCs)
-      auto * db = this->get_disconnected_boundaries();
+      const auto & bi = this->get_boundary_info();
 
       for (const auto & element : this->element_ptr_range())
         {
@@ -1015,14 +1015,28 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
 
                 for (const auto & [id, boundary_ptr] : *db)
                 {
+                  // if (!bi.has_boundary_id(element, ms, id))
+                  //   continue;
+
+                  std::cout << "boundary_ptr->myboundary = " << boundary_ptr->myboundary << std::endl;
+                  std::cout << "boundary_ptr->pairedboundary = " << boundary_ptr->pairedboundary << std::endl;
+
                   unsigned int neigh_side;
                   const Elem * neigh = db->neighbor(id, *point_locator, element, ms, &neigh_side, true /*skip_found_check*/);
-                  if (neigh && neigh != remote_elem && neigh != element)
+                  std::cout << "bi.has_boundary_id(element, ms, id) = "
+                            << bi.has_boundary_id(element, ms, id)
+                            << " for boundary id " << id << std::endl;
+                  std::cout << "neigh = " << neigh << std::endl;
+                  std::cout << "neigh == remote_elem? " << (neigh == remote_elem) << std::endl;
+                  std::cout << "neigh == nullptr? " << (neigh == nullptr) << std::endl;
+                  std::cout << "neigh == element? " << (neigh == element) << std::endl;
+
+                  if (neigh && neigh != remote_elem)
                     {
                       element->set_neighbor(ms, this->elem_ptr(neigh->id()));
                       this->elem_ptr(neigh->id())->set_neighbor(neigh_side, element);
                     }
-                }
+              }
             }
         }
     }
